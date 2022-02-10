@@ -302,3 +302,5 @@ uber_lyft_december_merge_dates_imp_info<- uber_lyft_december_merge_dates %>%
         dplyr::group_by(Date, weekday1, weekday2, weekday3) %>%
         summarize(total_rides=n())
 uber_lyft_december_merge_dates_imp_info
+
+#comment
