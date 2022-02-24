@@ -21,10 +21,7 @@ library(ggrepel)
 library(grid)
 library(forcats)
 library(magrittr)
-library(corrgram)
-library(corrplot)
-library(viridis)
-library(palmerpenguins)
+
 
 lyft.uber.dataset <- read_csv("/Users/bethanyleach/Downloads/rideshare_kaggle.csv")
 lyft.uber.revised <- as_tibble(lyft.uber.dataset)
@@ -81,8 +78,6 @@ ggmap(boston3) + stat_density_2d(data=lyft.uber.remove.na, aes(x=longitude, y=la
 ggmap(boston3) + stat_density_2d(data=lyft.uber.remove.na, aes(x=longitude, y=latitude, fill = stat(level)), alpha = 0.05, bins = 50, geom="polygon") + 
         scale_fill_gradientn(colors = brewer.pal(7, "Greens"))
 
-stat_density_boston_map <- ggmap(boston3) + stat_density_2d(data=lyft.uber.remove.na, aes(x=longitude, y=latitude, fill = stat(level)), geom="polygon") +
-        ggtitle("Density Map of Cab Rides in Boston Neighborhoods")
 
 #labeled neighborhood map
 lat <- c(42.364, 42.352, 42.3398, 42.3503, 42.3505, 42.3505, 42.3519, 42.3559, 42.3588, 42.3647, 42.3661, 42.3661)
@@ -97,10 +92,40 @@ neighborhood_map_adj <- ggmap(boston3) + geom_point(data=combined_df, aes(x=lon,
                                                                                            label = labels), fill = "white",
                                                                                            box.padding = unit(.4, "lines"),
                                                                                            label.padding = unit(.15, "lines"),
-                                                                                           segment.color = "red", segment.size = 1) + 
-        ggtitle("Labeled Map of Neighborhoods in Boston")
+                                                                                           segment.color = "red", segment.size = 1)
 
 
+#avg price by source & neighborhood map
+avg_price_simulator <- lyft.uber.remove.na %>%
+        group_by(source) %>%
+        mutate(average_price=mean(price))
+avg_price_simulator$average_price
+
+View(avg_price_simulator[c(8, 16, 17, 58)])
+unique(avg_price_simulator$average_price)
+
+neighborhood_avg_price <- avg_price_simulator[c(1, 8, 16, 17, 58)]
+neighborhood_avg_price
+neighborhood_avg_price_final <- unique(neighborhood_avg_price)
+
+remove_dups <- neighborhood_avg_price_final[!duplicated(neighborhood_avg_price_final$source), ]
+
+lat <- c(42.364, 42.352, 42.3398, 42.3503, 42.3505, 42.3505, 42.3519, 42.3559, 42.3588, 42.3647, 42.3661, 42.3661)
+lon <- c(-71.060, -71.065, -71.0892, -71.0810, -71.1054, -71.1054, -71.0551, -71.0550, -71.0707, -71.0542, -71.0631, -71.0631)
+labels_price <- c("Haymarket Square = $13.60", "Theatre District = $16.60", "Northeastern University = $17.90", "Back Bay = $16.00", 
+            "Boston University = $18.90", "Fenway = $18.40", "South Station = $15.70", "Financial District = $18.20", "Beacon Hill = $15.70", 
+            "North End = $15.20", "North Station = $16.40", "West End = $16.10")
+
+combined_df_price <- data.frame(lat, lon, labels_price)
+neighborhood_map_adj_price <- ggmap(boston3) + geom_point(data=combined_df_price, aes(x=lon, y=lat), 
+                                                    size=0.5, alpha =0.5, fill="red") + labs(x = 'Longitude', y = 'Latitude') +
+                                                    geom_label_repel(data=combined_df_price, aes(x = lon, y= lat,
+                                                                                           label = labels_price), fill = "white",
+                                                                                           size = 4,
+                                                                                           box.padding = unit(.4, "lines"),
+                                                                                           label.padding = unit(.15, "lines"),
+                                                                                           segment.color = "red", segment.size = 1) +
+                                                                                           ggtitle("Average Price Per Station in Boston, MA")
 
 #total number of rides by hour 
 hour_rides_data <- lyft.uber.remove.na %>%
@@ -142,11 +167,8 @@ uber_lyft_november_merge_dates <- uber_lyft_november_merge_dates %>%
         select(-datetime)
 uber_lyft_november_merge_dates
 
-
 uber_lyft_november_merge_dates <- uber_lyft_november_merge_dates %>%
-        filter(source != "NA") %>%
-        group_by(source) %>%
-        dplyr::summarize(total_rides = n())
+        filter(source != "NA")
 unique(uber_lyft_november_merge_dates$source)
 
 ggplot(uber_lyft_november_merge_dates, aes(source, fill=weekday3)) + geom_bar(position="dodge") + 
@@ -227,17 +249,6 @@ ggplot(day_Hour, aes(hour, total_rides, fill=weekday3)) + geom_bar(stat = "ident
         theme(plot.title = element_text(hjust=0.5)) +
         scale_fill_discrete(name = "Day of the Week") + ylab("Total Rides") + xlab("Hour")
 
-#daily number of rides per station 
-daily_rides_data <- full_nov_dec_df %>%
-        group_by(source, hour, weekday3) %>%
-        dplyr::summarize(total_rides = n())
-
-ggplot(daily_rides_data, aes(source, total_rides)) + 
-        geom_bar(stat = "identity", position = "dodge", aes(fill = weekday3)) + 
-        theme(axis.text.x = element_text(angle=90)) + xlab("Source") + ylab("Total Rides") +
-        ggtitle("Total Number of Rides pet Day of the Week by Source") +
-        scale_fill_discrete(name = "Day of the Week")
-        
 
 #total rides by day
 rides_total_day <- full_nov_dec_df %>%
@@ -312,6 +323,14 @@ ggplot(uber_lyft_rides_per_day_december, aes(day, total_rides)) + geom_bar(stat 
         ggtitle("Total Rides Per Day in December 2018") + theme(legend.position = "none") + 
         scale_y_continuous(labels=comma) + xlab("Day") + ylab("Total Rides")
 
+#surge exploration COME BACK COME BACK 
+lyft.uber.remove.na_surge <- lyft.uber.remove.na %>%
+        filter(cab_type == "Lyft") %>%
+        dplyr::group_by(hour, surge_multiplier) %>%
+        summarize(total_rides = n())
+
+ggplot(lyft.uber.remove.na_surge, aes(hour, total_rides, fill = surge_multiplier)) + geom_bar(stat = "identity") + 
+        scale_y_continuous(labels = comma)
 
 #Price vs hour - uber - distance/price to start
 lyft.uber.price.vs.hour <- lyft.uber.remove.na %>%
@@ -336,293 +355,36 @@ lyft.uber.avg.dist.hour <- lyft.uber.price.vs.hour %>%
         group_by(hour) %>%
         summarize_at(vars(distance), list(name = mean))
 
-ggplot(lyft.uber.avg.dist.hour, aes(hour, name)) + geom_line() + ggtitle("Average Ride Distance by Hour") + xlab("Hour of the Day") + 
-        ylab("Average Distance (Miles)")
-
-#Correlation between Price, Distance, Surge Multiplier (Lyft)
-lyft.uber.remove.na_UBER <- lyft.uber.remove.na %>%
-        filter(cab_type == "Uber")
-mydata_UBER <- lyft.uber.remove.na_UBER[, c(13,14)]
-corrplot(cor(mydata_UBER), tl.col = "brown", tl.srt = 30, bg = "White",
-         title = "\n\n Uber: Correlation Between Price and Distance",
-         type = "full", col=brewer.pal(n=8, name="RdYlBu"))
-cor(lyft.uber.remove.na_UBER[, c(13,14)])
 
 
-lyft.uber.remove.na_LYFT <- lyft.uber.remove.na %>%
-        filter(cab_type == "Lyft")
-mydata_LYFT <- lyft.uber.remove.na_LYFT[, c(13,14,15)]
-corrplot(cor(mydata_LYFT), tl.col = "brown", tl.srt = 30, bg = "White",
-         title = "\n\n Lyft: Correlation Between Price, Distance, and Surge Multiplier",
-         type = "full")
-cor(lyft.uber.remove.na_LYFT[, c(13,14,15)])
-
-#Lyft - Surge Per Hour
-lyft.uber.remove.na_surge <- lyft.uber.remove.na %>%
-        filter(cab_type == "Lyft", surge_multiplier > 1.00) %>%
-        dplyr::group_by(hour, surge_multiplier) %>%
-        summarize(total_rides = n())
-
-lyft.uber.remove.na_surge$surge_multiplier <- as.factor(lyft.uber.remove.na_surge$surge_multiplier)
-
-ggplot(lyft.uber.remove.na_surge, aes(hour, total_rides, color = surge_multiplier)) + 
-        geom_point(alpha=0.8, size=1, aes(color = surge_multiplier)) + 
-        geom_line(aes(color = surge_multiplier)) + ggtitle("Lyft: Total Rides vs Hour of the Day Per Surge Multiplier") +
-        facet_wrap(~surge_multiplier, ncol=1, scales="free") + xlab("Hour") + ylab("Total Rides") +
-        guides(color=guide_legend(ncol=1)) + theme(legend.position="none",
-                                                   panel.border = element_blank(), 
-                                                   panel.spacing.x = unit(0,"line"))
-
-
-
-#Surge-Day of Week-Total Rides Lyft
-day_Hour_lyft_surge <- full_nov_dec_df %>%
-        filter(weekday3 != "NA", surge_multiplier > 1.00) %>%
-        group_by(day, weekday3, surge_multiplier) %>%
-        dplyr::summarize(total_rides=n())
-
-ggplot(day_Hour_lyft_surge, aes(weekday3, total_rides, fill=surge_multiplier)) + geom_bar(stat = "identity", position="dodge") + 
-        ggtitle("Relationship Between Total Rides and Day of the Week With Respect to Surge Multiplier") + 
-        theme(plot.title = element_text(hjust=0.5), axis.text.x = element_text(angle = 45)) +
-        xlab("Day of the Week") + ylab("Total Rides") +
-        scale_fill_gradient(low="pink",high="darkred") +
-        facet_wrap(~surge_multiplier, ncol=2, scales="free") + guides(color=guide_legend(ncol=1)) + theme(legend.position="none",
-                                                                                  panel.border = element_blank(), 
-                                                                                  panel.spacing.x = unit(0,"line"))
-
-ggplot(day_Hour_lyft_surge, aes(weekday3, total_rides, fill=surge_multiplier)) + geom_bar(stat = "bin") + 
-        ggtitle("Relationship Between Total Rides and Day of the Week With Respect to Surge Multiplier") + 
-        theme(plot.title = element_text(hjust=0.5), axis.text.x = element_text(angle = 45)) +
-        xlab("Day of the Week") + ylab("Total Rides") +
-        scale_fill_gradient(low="pink",high="darkred") +
-        facet_wrap(~surge_multiplier, ncol=2, scales="free") + guides(color=guide_legend(ncol=1)) + theme(legend.position="none",
-                                                                                                          panel.border = element_blank(), 
-                                                                                                          panel.spacing.x = unit(0,"line"))
-# Surge Day of Week - Lyft - Simplified
-
-ggplot(data = day_Hour_lyft_surge, aes(x = weekday3, y = total_rides, fill = factor(surge_multiplier))) + 
-        geom_bar(stat = "identity", position = "dodge") + 
-        xlab("Day of the Week") + ylab("Total Rides") + ggtitle("Total Rides vs Day of the Week Per Surge Multiplier") + 
-        labs(fill="Surge Multiplier")
-
-#Surge Rides Source - Lyft
-source_destination_lyft_surge <- full_nov_dec_df %>%
-        filter(source != "NA", destination != "NA", surge_multiplier > 1.00) %>%
-        group_by(source, destination, surge_multiplier, weekday3) %>%
-        dplyr::summarize(total_rides = n()) %>%
-        arrange(desc(total_rides))
-
-source_destination_lyft_surge_combine <- source_destination_lyft_surge %>%
-        unite('Route', source:destination, remove = FALSE)
-
-data_source_destination_route <- source_destination_lyft_surge_combine[with(source_destination_lyft_surge_combine,order(-total_rides)),]
-
-data_source_destination_route_2 <- data_source_destination_route
+# Specify data frame
+GFG%>%                                        
         
-total_rides_route <- ddply(data_source_destination_route_2,"Route",numcolwise(sum))
-total_rides_route_desc <- total_rides_route %>%
-        arrange(desc(total_rides))
-data_source_destination_route <- total_rides_route_desc[1:10,]
-data_source_destination_route_lowest <- total_rides_route_desc[63:72,]
+        # Specify group indicator, column, function
+        group_by(Category) %>%                        
+        summarise_at(vars(Frequency),
+                     list(name = mean))
 
 
-ggplot(data = data_source_destination_route, aes(forcats::fct_reorder(Route, desc(total_rides)), total_rides)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + ggtitle("Surge: Relationship Between Lyft Rides and Routes - Upper Bound") +
-        scale_y_continuous(breaks = c(100, 200, 300, 400, 500, 600))
 
-ggplot(data = data_source_destination_route_lowest, aes(forcats::fct_reorder(Route, desc(total_rides)), total_rides)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + ggtitle("Surge: Relationship Between Lyft Rides and Routes - Lower Bound") +
-        scale_y_continuous(breaks = c(20, 40, 60, 80))
+dt[ ,list(mean=mean(col_to_aggregate)), by=col_to_group_by]
 
 
-#avg price by source & neighborhood map
-#Both cab types
-#Both Surge and no Surge
-avg_price_simulator <- full_nov_dec_df
-avg_price_simulator <- avg_price_simulator[-c(1:2, 4:6, 10:11, 15:50)]
-avg_price_simulator_reduced <- avg_price_simulator[-c(8:18)]
-
-avg_price_simulator_reduced_2 <- avg_price_simulator_reduced 
-
-source_destination_lyft_surge_2 <- avg_price_simulator_reduced_2 %>%
-        unite('Route', source:destination, remove = FALSE)
-
-source_destination_lyft_surge_2_adj<- source_destination_lyft_surge_2 %>%
-        group_by(Route) %>%
-        dplyr::summarize(total_rides = n(), mean_price = mean(price))
-source_destination_lyft_surge_2_adj
-
-
-price_rides_route <- source_destination_lyft_surge_2_adj %>%
-        arrange(desc(mean_price))
-price_rides_route_desc <- price_rides_route[1:5,]
-price_rides_route_asc <- price_rides_route[68:72,]
-price_rides_route_top_lowest <- rbind(price_rides_route_desc, price_rides_route_asc)
-
-ggplot(data = price_rides_route_desc, aes(forcats::fct_reorder(Route, desc(mean_price)), mean_price)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + ggtitle("Mean Ride Price vs Cab Route") + 
-        geom_text(aes(label=round(mean_price, 1)))
-
-ggplot(data = price_rides_route_top_lowest, aes(forcats::fct_reorder(Route, desc(mean_price)), mean_price)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + ggtitle("Five Priciest and Five Least Priciest Ride Price vs Cab Route") + 
-        geom_text(aes(label=round(mean_price, 1)))
-
-#hour of day shortest ride and longest ride
-#previous graph shows most expensive avg ride being financial district to boston university
-#and least expensive being #All Cab Types
-source_destination_lyft_surge_2_adj_hour_shortest_ride <- source_destination_lyft_surge_2 %>%
-        filter(Route=="Haymarket Square_North Station") %>%
-        group_by(hour) %>%
-        dplyr::summarize(total_rides = n())
-
-source_destination_lyft_surge_2_adj_hour_longest_ride <- source_destination_lyft_surge_2 %>%
-        filter(Route=="Financial District_Boston University") %>%
-        group_by(hour) %>%
-        dplyr::summarize(total_rides = n())
-
-longest_shortest_combined <- rbind(source_destination_lyft_surge_2_adj_hour_shortest_ride,
-                                   source_destination_lyft_surge_2_adj_hour_longest_ride)
-
-ggplot(data = source_destination_lyft_surge_2_adj_hour_shortest_ride, aes(hour, total_rides, color="green")) +
-        geom_bar(stat = "identity", position = "dodge", fill="purple") + xlab("Hour") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + 
-        ggtitle("Haymarket Sqare to North Station - Number of Rides Per Hour")
-
-ggplot(data = source_destination_lyft_surge_2_adj_hour_longest_ride, aes(hour, total_rides, color="green")) +
-        geom_bar(stat = "identity", position = "dodge", fill="purple") + xlab("Hour") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + 
-        ggtitle("Financial District to Boston University - Number of Rides Per Hour") +
-        theme(legend.position="none")
-
-#Uber Avg Price vs Route Info
-avg_price_simulator_reduced_3 <- avg_price_simulator_reduced
-source_destination_lyft_surge_3 <- avg_price_simulator_reduced_3 %>%
-        unite('Route', source:destination, remove = FALSE)
-
-source_destination_lyft_surge_3_adj<- source_destination_lyft_surge_3 %>%
+#average price per hour no surge - Uber
+lyft.uber.price.per.mile <- lyft.uber.remove.na %>%
         filter(cab_type == "Uber") %>%
-        group_by(Route) %>%
-        dplyr::summarize(total_rides = n(), mean_price = mean(price))
-source_destination_lyft_surge_3_adj
+        mutate(price_dist = price/distance)
 
-price_rides_route_SURGE <- source_destination_lyft_surge_3_adj %>%
-        arrange(desc(mean_price))
-
-price_rides_route_desc_SURGE <- price_rides_route_SURGE[1:5,]
-price_rides_route_asc_SURGE <- price_rides_route_SURGE[68:72,]
-price_rides_route_top_lowest_SURGE <- rbind(price_rides_route_desc_SURGE, price_rides_route_asc_SURGE)
+ggplot(lyft.uber.price.per.mile, aes(hour, price_dist)) + geom_point()
 
 
-ggplot(data = price_rides_route_top_lowest_SURGE, aes(forcats::fct_reorder(Route, desc(mean_price)), mean_price)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + 
-        ggtitle("Uber: Five Priciest and Five Least Priciest Ride Price vs Cab Route") + 
-        geom_text(aes(label=round(mean_price, 1)))
 
-#Lyft Avg Price vs Route (no surge)
-avg_price_simulator_reduced_4 <- avg_price_simulator_reduced
-source_destination_lyft_surge_4 <- avg_price_simulator_reduced_4 %>%
-        unite('Route', source:destination, remove = FALSE)
+___________________________________________________________________
+uber_lyft_rides_per_day_november <- lyft.uber.remove.na_months %>%
+        group_by(month_name, day) %>%
+        summarize(total_rides=n()) %>%
+        filter(month_name == "November")
 
-source_destination_lyft_surge_4_adj<- source_destination_lyft_surge_4 %>%
-        filter(cab_type == "Lyft", surge_multiplier == 1) %>%
-        group_by(Route) %>%
-        dplyr::summarize(total_rides = n(), mean_price = mean(price))
-source_destination_lyft_surge_4_adj
-
-lyft_no_surge_price_rides_route <- source_destination_lyft_surge_4_adj %>%
-        arrange(desc(mean_price))
-
-lyft_no_surge_price_rides_route_asc <- lyft_no_surge_price_rides_route[1:5,]
-lyft_no_surge_price_rides_route_desc <- lyft_no_surge_price_rides_route[68:72,]
-lyft_no_surge_price_rides_route_top_lowest <- rbind(lyft_no_surge_price_rides_route_asc, lyft_no_surge_price_rides_route_desc)
-
-
-ggplot(data = lyft_no_surge_price_rides_route_top_lowest, aes(forcats::fct_reorder(Route, desc(mean_price)), mean_price)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + 
-        ggtitle("Lyft (No Surge): Five Priciest and Five Least Priciest Ride Price vs Cab Route") + 
-        geom_text(aes(label=round(mean_price, 1)))
-
-#Lyft Avg Price vs Route (SURGE = 1.25-1.75)
-avg_price_simulator_reduced_1.25.75 <- avg_price_simulator_reduced
-source_destination_lyft_surge_1.25.75 <- avg_price_simulator_reduced_1.25.75 %>%
-        unite('Route', source:destination, remove = FALSE)
-
-source_destination_lyft_surge_1.25.75_adj<- source_destination_lyft_surge_1.25.75 %>%
-        filter(cab_type == "Lyft", surge_multiplier >= 1.25, surge_multiplier <= 1.75) %>%
-        group_by(Route) %>%
-        dplyr::summarize(total_rides = n(), mean_price = mean(price))
-source_destination_lyft_surge_1.25.75_adj
-
-lyft_1.25.75_surge_price_rides_route <- source_destination_lyft_surge_1.25.75_adj %>%
-        arrange(desc(mean_price))
-
-lyft_1.25.75_surge_price_rides_route_asc <- lyft_1.25.75_surge_price_rides_route[1:5,]
-lyft_1.25.75_surge_price_rides_route_desc <- lyft_1.25.75_surge_price_rides_route[68:72,]
-lyft_1.25.75_surge_price_rides_route_top_lowest <- rbind(lyft_1.25.75_surge_price_rides_route_asc, lyft_1.25.75_surge_price_rides_route_desc)
-
-
-ggplot(data = lyft_1.25.75_surge_price_rides_route_top_lowest, aes(forcats::fct_reorder(Route, desc(mean_price)), mean_price)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + 
-        ggtitle("1.25-1.75 Surge Data: Five Priciest and Five Least Priciest Ride Price vs Cab Route") + 
-        geom_text(aes(label=round(mean_price, 1)))
-
-#Lyft Avg Price vs Route (SURGE = 2.00 - 3.00)
-avg_price_simulator_reduced_2.3 <- avg_price_simulator_reduced
-source_destination_lyft_surge_2.3 <- avg_price_simulator_reduced_2.3 %>%
-        unite('Route', source:destination, remove = FALSE)
-
-source_destination_lyft_surge_2.3_adj<- source_destination_lyft_surge_2.3 %>%
-        filter(cab_type == "Lyft", surge_multiplier >= 2.00, surge_multiplier <= 3.00) %>%
-        group_by(Route) %>%
-        dplyr::summarize(total_rides = n(), mean_price = mean(price))
-source_destination_lyft_surge_2.3_adj
-
-lyft_2.3_surge_price_rides_route <- source_destination_lyft_surge_2.3_adj %>%
-        arrange(desc(mean_price))
-
-lyft_2.3_surge_price_rides_route_asc <- lyft_2.3_surge_price_rides_route[1:5,]
-lyft_2.3_surge_price_rides_route_desc <- lyft_2.3_surge_price_rides_route[50:54,]
-lyft_2.3_surge_price_rides_route_top_lowest <- rbind(lyft_2.3_surge_price_rides_route_asc, lyft_2.3_surge_price_rides_route_desc)
-
-
-ggplot(data = lyft_2.3_surge_price_rides_route_top_lowest, aes(forcats::fct_reorder(Route, desc(mean_price)), mean_price)) +
-        geom_bar(stat = "identity", position = "dodge", aes(fill=Route)) + xlab("Route") + ylab("Total Rides") +
-        theme(axis.text.x = element_text(angle=90)) + 
-        ggtitle("2.00-3.00 Surge: Five Priciest and Five Least Priciest Ride Price vs Cab Route") + 
-        geom_text(aes(label=round(mean_price, 1)))
-
-#Surge Experiment - Lyft (Days) - November
-uber_lyft_rides_per_day_november_LYFT <- lyft.uber.remove.na_months
-
-uber_lyft_rides_per_day_november_LYFT <- lyft.uber.remove.na_months %>%
-        filter(cab_type=="Lyft", month_name=="November", surge_multiplier > 1.00)
-
-uber_lyft_rides_per_day_november_LYFT <- uber_lyft_rides_per_day_november_LYFT %>%
-        group_by(surge_multiplier, day)%>%
-        summarize(total_rides=n())
-
-ggplot(uber_lyft_rides_per_day_november_LYFT, aes(x=day, y=total_rides, fill=surge_multiplier))+ geom_bar(stat="identity", position="dodge") + 
-        scale_fill_gradient(low="orange",high="darkblue") + 
-        ggtitle("Total Rides Per Day (November) With Respect to Surge Multiplier") + 
-        xlab("Day (November)") + ylab("Total Rides") + facet_wrap(~surge_multiplier)
-
-#Surge Experiment - Lyft (Days) - December
-uber_lyft_rides_per_day_december_LYFT <- lyft.uber.remove.na_months
-
-uber_lyft_rides_per_day_december_LYFT <- lyft.uber.remove.na_months %>%
-        filter(cab_type=="Lyft", month_name=="December", surge_multiplier > 1.25)
-
-uber_lyft_rides_per_day_december_LYFT <- uber_lyft_rides_per_day_december_LYFT %>%
-        group_by(surge_multiplier, day)%>%
-        summarize(total_rides=n())
-
-ggplot(uber_lyft_rides_per_day_december_LYFT, aes(x=day, y=total_rides, fill=surge_multiplier))+ geom_bar(stat="identity", position="dodge") + 
-        scale_fill_gradient(low="orange",high="darkblue") +
-        ggtitle("Total Rides Per Day (December) With Respect to Surge Multiplier") + xlab("Day (December)") + ylab("Total Rides")
+ggplot(uber_lyft_rides_per_day_november, aes(day, total_rides)) + geom_bar(stat = "identity", fill = "purple") + 
+        ggtitle("Total Rides Per Day in November 2018") + theme(legend.position = "none") + 
+        scale_y_continuous(labels=comma) + xlab("Day") + ylab("Total Rides")
