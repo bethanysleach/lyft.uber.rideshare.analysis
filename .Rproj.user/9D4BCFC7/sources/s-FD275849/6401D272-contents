@@ -378,8 +378,6 @@ lyft.uber.price.per.mile <- lyft.uber.remove.na %>%
 ggplot(lyft.uber.price.per.mile, aes(hour, price_dist)) + geom_point()
 
 
-
-___________________________________________________________________
 uber_lyft_rides_per_day_november <- lyft.uber.remove.na_months %>%
         group_by(month_name, day) %>%
         summarize(total_rides=n()) %>%
