@@ -25,7 +25,6 @@ library(corrgram)
 library(corrplot)
 library(viridis)
 library(palmerpenguins)
-library(plyr)
 
 lyft.uber.dataset <- read_csv("/Users/bethanyleach/Downloads/rideshare_kaggle.csv")
 lyft.uber.revised <- as_tibble(lyft.uber.dataset)
@@ -85,6 +84,23 @@ ggmap(boston3) + stat_density_2d(data=lyft.uber.remove.na, aes(x=longitude, y=la
 stat_density_boston_map <- ggmap(boston3) + stat_density_2d(data=lyft.uber.remove.na, aes(x=longitude, y=latitude, fill = stat(level)), geom="polygon") +
         ggtitle("Density Map of Cab Rides in Boston Neighborhoods")
 
+#labeled neighborhood map
+lat <- c(42.364, 42.352, 42.3398, 42.3503, 42.3505, 42.3505, 42.3519, 42.3559, 42.3588, 42.3647, 42.3661, 42.3661)
+lon <- c(-71.060, -71.065, -71.0892, -71.0810, -71.1054, -71.1054, -71.0551, -71.0550, -71.0707, -71.0542, -71.0631, -71.0631)
+labels <- c("Haymarket Square", "Theatre District", "Northeastern University", "Back Bay", "Boston University",
+            "Fenway", "South Station", "Financial District", "Beacon Hill", "North End", "North Station", "West End")
+
+combined_df <- data.frame(lat, lon, labels)
+neighborhood_map_adj <- ggmap(boston3) + geom_point(data=combined_df, aes(x=lon, y=lat), 
+                                                    size=0.5, alpha =0.5, fill="red") + labs(x = 'Longitude', y = 'Latitude') +
+                                                    geom_label_repel(data=combined_df, aes(x = lon, y= lat,
+                                                                                           label = labels), fill = "white",
+                                                                                           box.padding = unit(.4, "lines"),
+                                                                                           label.padding = unit(.15, "lines"),
+                                                                                           segment.color = "red", segment.size = 1) + 
+        ggtitle("Labeled Map of Neighborhoods in Boston")
+
+
 
 #total number of rides by hour 
 hour_rides_data <- lyft.uber.remove.na %>%
@@ -126,10 +142,12 @@ uber_lyft_november_merge_dates <- uber_lyft_november_merge_dates %>%
         select(-datetime)
 uber_lyft_november_merge_dates
 
-uber_lyft_november_merge_dates <- uber_lyft_november_merge_dates %>%
-        filter(source != "NA")
-unique(uber_lyft_november_merge_dates)
 
+uber_lyft_november_merge_dates <- uber_lyft_november_merge_dates %>%
+        filter(source != "NA") %>%
+        group_by(source) %>%
+        dplyr::summarize(total_rides = n())
+unique(uber_lyft_november_merge_dates$source)
 
 ggplot(uber_lyft_november_merge_dates, aes(source, fill=weekday3)) + geom_bar(position="dodge") + 
         scale_y_continuous(labels=comma) + theme(axis.text.x = element_text(angle=90, vjust=.5, hjust=1)) + 
@@ -148,8 +166,7 @@ sort(uber_lyft_rides_per_day_december$datetime, decreasing = FALSE)
 uber_lyft_rides_per_day_december_altered_date <- uber_lyft_rides_per_day_december 
 
 uber_lyft_rides_per_day_december_altered_date$Date <- as.Date(uber_lyft_rides_per_day_december_altered_date$datetime)
-uber_lyft_rides_per_day_december_altered_date$Time <- format(as.POSIXct(uber_lyft_rides_per_day_december_altered_date$datetime), 
-                                                             format = "%H:%M:%S")
+uber_lyft_rides_per_day_december_altered_date$Time <- format(as.POSIXct(uber_lyft_rides_per_day_december_altered_date$datetime), format = "%H:%M:%S")
 
 begin <- as.POSIXct("2018-12-01")
 finish <- as.POSIXct("2018-12-18")
@@ -195,7 +212,7 @@ lyft.uber.remove.na_months
 uber_lyft_rides_per_day_november <- lyft.uber.remove.na_months %>%
         filter(month_name == "November")
 
-uber_lyft_rides_per_day_december <- lyft.uber.remove.na_months %>%
+ber_lyft_rides_per_day_december <- lyft.uber.remove.na_months %>%
         filter(month_name == "December")
 
 full_nov_dec_df <- rbind(uber_lyft_november_merge_dates, uber_lyft_december_merge_dates)
@@ -209,7 +226,6 @@ ggplot(day_Hour, aes(hour, total_rides, fill=weekday3)) + geom_bar(stat = "ident
         ggtitle("Rides by Hour and Day of the Week") + 
         theme(plot.title = element_text(hjust=0.5)) +
         scale_fill_discrete(name = "Day of the Week") + ylab("Total Rides") + xlab("Hour")
-
 
 #daily number of rides per station 
 daily_rides_data <- full_nov_dec_df %>%
