@@ -379,3 +379,30 @@ HEAT MAP
 ggplot(day_Hour,aes(day, hour, fill = Total)) +
         geom_tile(color="White") +
         ggtitle("Heat Map By Hour/Day")
+
+
+
+
+
+#Lyft.Uber.TotalRides vs Temperature + Wind Gust
+temp_rides_data <- lyft.uber.remove.na %>%
+        dplyr::group_by(temperature, cab_type) %>%
+        dplyr::summarize(total_rides = n())
+
+ggplot(temp_rides_data, aes(temperature, total_rides, color=cab_type)) + 
+        geom_line() +
+        theme(legend.position="right") + ggtitle("Total Rides vs Temperature (F)") + 
+        ylab("Total Rides") + 
+        theme(plot.title = element_text(hjust=0.5)) + xlim(30,50) + ylim(0,2000)
+
+wind_gust_rides_data <- lyft.uber.remove.na %>%
+        dplyr::group_by(windGust, temperature, cab_type) %>%
+        dplyr::summarize(total_rides = n())
+
+ggplot(wind_gust_rides_data, aes(temperature, total_rides, color=windGust)) + 
+        geom_line() + geom_point() +
+        theme(legend.position="right") + ggtitle("Total Rides vs Temperature (F) Colored by Wind Gust (mph") + 
+        ylab("Total Rides") + xlab("Temperature") +
+        theme(plot.title = element_text(hjust=0.5)) + xlim(30,50) + ylim(0,2000)
+
+cor(wind_gust_rides_data$windGust, wind_gust_rides_data$total_rides)
